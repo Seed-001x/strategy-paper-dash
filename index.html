@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Strategy Paper — Live</title>
+<style>
+  body{background:#0b0e13;color:#dbe4f0;font:14px/1.5 -apple-system,system-ui,sans-serif;margin:0;padding:18px}
+  h1{font-size:20px;margin:0} h1 em{font-style:normal;color:#8b7cf6}
+  .sub{color:#8fa3bf;font-size:12px;margin:2px 0 14px}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#34d399;margin-right:6px;animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px;margin-bottom:16px}
+  .card{background:#131926;border:1px solid #22304a;border-radius:12px;padding:12px}
+  .card b{display:block;font-size:20px} .card span{color:#8fa3bf;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  .pos{color:#34d399}.neg{color:#f87171}
+  table{width:100%;border-collapse:collapse;background:#131926;border:1px solid #22304a;border-radius:12px;overflow:hidden}
+  td,th{padding:7px 10px;border-bottom:1px solid #1c2940;text-align:left;font-size:13px} th{color:#8fa3bf;font-weight:600}
+  h2{font-size:14px;margin:18px 0 8px;color:#aebfd8}
+  .pill{display:inline-block;padding:1px 8px;border-radius:99px;background:#22304a;font-size:11px}
+  .pill.hot{background:#3b2f63;color:#c9bdff} .pill.win{background:#14532d;color:#86efac} .pill.loss{background:#5b1d1d;color:#fca5a5}
+  .cols{display:grid;grid-template-columns:1fr;gap:0} @media(min-width:900px){.cols{grid-template-columns:1fr 1fr;gap:18px}}
+</style>
+</head>
+<body>
+<h1>STRATEGY <em>PAPER</em></h1>
+<div class="sub"><span class="dot"></span><span id="live">connecting…</span> · K1LLSW1TCH Strategy v1 · paper only, no wallet · SOL $<span id="sol">—</span></div>
+
+<div class="grid" id="cards"></div>
+
+<div id="openwrap"></div>
+
+<div class="cols">
+  <div>
+    <h2>Live feed — triggers, near-misses, 40+ scores</h2>
+    <table><thead><tr><th>Time</th><th>Event</th><th>Coin</th><th>Detail</th></tr></thead><tbody id="feed"></tbody></table>
+  </div>
+  <div>
+    <h2>Latest coins scored</h2>
+    <table><thead><tr><th>Time</th><th>Coin</th><th>Score</th><th>Breakdown</th></tr></thead><tbody id="scores"></tbody></table>
+    <h2>Top scores</h2>
+    <table><thead><tr><th>Coin</th><th>Score</th><th>When</th></tr></thead><tbody id="top"></tbody></table>
+  </div>
+</div>
+
+<div class="sub" style="margin-top:14px">Fills include 2.7% round-trip drag · scores exclude unmeasured forensic items (bot share, unique wallets, creator self-buy) · data refreshes about every 90 seconds</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const ago = (ts) => { const s = Math.max(0, Math.round((Date.now() - ts) / 1000)); return s < 60 ? s + 's ago' : Math.round(s / 60) + 'm ago'; };
+const tstr = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+async function tick() {
+  try {
+    const r = await fetch('data.json?t=' + Date.now());
+    const d = await r.json();
+    const s = d.summary;
+    $('sol').textContent = d.solUsd ?? '—';
+    $('live').textContent = 'live · updated ' + ago(d.generatedAt);
+    const wr = s.closes ? Math.round(s.wins / s.closes * 100) + '%' : '—';
+    const cards = [
+      [s.scored, 'coins scored'], [s.above, 'scored 40+'], [s.nears, 'near-misses'],
+      [s.opens + ' (A ' + s.opensA + ' · B ' + s.opensB + ')', 'opened'],
+      [s.closes, 'closed'], [wr, 'win rate'],
+      ['<span class="' + (s.net >= 0 ? 'pos' : 'neg') + '">' + (s.net >= 0 ? '+' : '') + s.net.toFixed(4) + '</span>', 'net paper SOL'],
+      [d.openNow.length, 'open now'], [s.watching, 'watching'],
+    ];
+    $('cards').innerHTML = cards.map(c => '<div class="card"><b>' + c[0] + '</b><span>' + c[1] + '</span></div>').join('');
+    $('openwrap').innerHTML = d.openNow.length
+      ? '<h2>Open positions</h2><table><thead><tr><th>Coin</th><th>Trigger</th><th>Score</th><th>Size</th><th>Entry</th><th>Peak</th><th>Age</th></tr></thead><tbody>' +
+        d.openNow.map(p => '<tr><td>' + esc(p.symbol) + '</td><td><span class="pill">' + p.trigger + '</span></td><td>' + p.score + '</td><td>' + p.sizeSol + ' SOL</td><td>$' + p.entryPrice + '</td><td>' + (p.entryPrice ? (p.peak / p.entryPrice).toFixed(2) + 'x' : '—') + '</td><td>' + ago(p.openedAt) + '</td></tr>').join('') + '</tbody></table>'
+      : '';
+    $('feed').innerHTML = d.feed.length ? d.feed.map(e => {
+      let detail = '', cls = 'pill';
+      if (e.ev === 'score') { detail = 'score ' + e.score; cls += ' hot'; }
+      if (e.ev === 'near_miss') detail = 'near-miss · gain ' + (e.gain != null ? Math.round(e.gain * 100) + '%' : '—') + ' · ratio ' + (e.ratio ?? '—');
+      if (e.ev === 'open') detail = 'trigger ' + e.trigger + ' · score ' + e.score + ' · ' + e.sizeSol + ' SOL';
+      if (e.ev === 'partial') detail = e.reason + ' · +' + (e.proceedsSol ?? 0).toFixed(4) + ' SOL out';
+      if (e.ev === 'close') { detail = e.reason; cls += (e.pnlSol >= 0 ? ' win' : ' loss'); }
+      return '<tr><td>' + tstr(e.ts) + '</td><td><span class="' + cls + '">' + e.ev + '</span></td><td>' + esc(e.symbol) + '</td><td>' + esc(detail) + (e.ev === 'close' ? ' · <b class="' + (e.pnlSol >= 0 ? 'pos' : 'neg') + '">' + (e.pnlSol >= 0 ? '+' : '') + (e.pnlSol ?? 0).toFixed(4) + '</b>' : '') + '</td></tr>';
+    }).join('') : '<tr><td colspan="4">Nothing yet — waiting for the first trigger or 40+ score.</td></tr>';
+    $('scores').innerHTML = d.recentScores.map(s2 => '<tr><td>' + tstr(s2.ts) + '</td><td>' + esc(s2.symbol) + '</td><td>' + s2.score + '</td><td>' + Object.entries(s2.parts || {}).filter(([, v]) => v).map(([k, v]) => k + ' ' + (v > 0 ? '+' : '') + v).join(' · ') + '</td></tr>').join('');
+    $('top').innerHTML = d.topScores.map(s2 => '<tr><td>' + esc(s2.symbol) + '</td><td>' + s2.score + '</td><td>' + ago(s2.ts) + '</td></tr>').join('');
+  } catch { $('live').textContent = 'reconnecting…'; }
+}
+tick(); setInterval(tick, 30000);
+</script>
+</body>
+</html>
