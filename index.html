@@ -18,6 +18,7 @@
   td,th{padding:7px 10px;border-bottom:1px solid #1c2940;text-align:left;font-size:13px} th{color:#8fa3bf;font-weight:600}
   h2{font-size:14px;margin:18px 0 8px;color:#aebfd8}
   .pill{display:inline-block;padding:1px 8px;border-radius:99px;background:#22304a;font-size:11px}
+  a.coin{color:#c9bdff;text-decoration:none;font-weight:600} a.coin:hover{text-decoration:underline}
   .pill.hot{background:#3b2f63;color:#c9bdff} .pill.win{background:#14532d;color:#86efac} .pill.loss{background:#5b1d1d;color:#fca5a5}
   .cols{display:grid;grid-template-columns:1fr;gap:0} @media(min-width:900px){.cols{grid-template-columns:1fr 1fr;gap:18px}}
 </style>
@@ -50,6 +51,7 @@ const $ = (id) => document.getElementById(id);
 const ago = (ts) => { const s = Math.max(0, Math.round((Date.now() - ts) / 1000)); return s < 60 ? s + 's ago' : Math.round(s / 60) + 'm ago'; };
 const tstr = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const coin = (symbol, mint) => mint ? '<a class="coin" href="https://pump.fun/coin/' + mint + '" target="_blank" rel="noopener">' + esc(symbol) + '</a>' : esc(symbol);
 
 async function tick() {
   try {
@@ -69,7 +71,7 @@ async function tick() {
     $('cards').innerHTML = cards.map(c => '<div class="card"><b>' + c[0] + '</b><span>' + c[1] + '</span></div>').join('');
     $('openwrap').innerHTML = d.openNow.length
       ? '<h2>Open positions</h2><table><thead><tr><th>Coin</th><th>Trigger</th><th>Score</th><th>Size</th><th>Entry</th><th>Peak</th><th>Age</th></tr></thead><tbody>' +
-        d.openNow.map(p => '<tr><td>' + esc(p.symbol) + '</td><td><span class="pill">' + p.trigger + '</span></td><td>' + p.score + '</td><td>' + p.sizeSol + ' SOL</td><td>$' + p.entryPrice + '</td><td>' + (p.entryPrice ? (p.peak / p.entryPrice).toFixed(2) + 'x' : '—') + '</td><td>' + ago(p.openedAt) + '</td></tr>').join('') + '</tbody></table>'
+        d.openNow.map(p => '<tr><td>' + coin(p.symbol, p.mint) + '</td><td><span class="pill">' + p.trigger + '</span></td><td>' + p.score + '</td><td>' + p.sizeSol + ' SOL</td><td>$' + p.entryPrice + '</td><td>' + (p.entryPrice ? (p.peak / p.entryPrice).toFixed(2) + 'x' : '—') + '</td><td>' + ago(p.openedAt) + '</td></tr>').join('') + '</tbody></table>'
       : '';
     $('feed').innerHTML = d.feed.length ? d.feed.map(e => {
       let detail = '', cls = 'pill';
@@ -78,10 +80,10 @@ async function tick() {
       if (e.ev === 'open') detail = 'trigger ' + e.trigger + ' · score ' + e.score + ' · ' + e.sizeSol + ' SOL';
       if (e.ev === 'partial') detail = e.reason + ' · +' + (e.proceedsSol ?? 0).toFixed(4) + ' SOL out';
       if (e.ev === 'close') { detail = e.reason; cls += (e.pnlSol >= 0 ? ' win' : ' loss'); }
-      return '<tr><td>' + tstr(e.ts) + '</td><td><span class="' + cls + '">' + e.ev + '</span></td><td>' + esc(e.symbol) + '</td><td>' + esc(detail) + (e.ev === 'close' ? ' · <b class="' + (e.pnlSol >= 0 ? 'pos' : 'neg') + '">' + (e.pnlSol >= 0 ? '+' : '') + (e.pnlSol ?? 0).toFixed(4) + '</b>' : '') + '</td></tr>';
+      return '<tr><td>' + tstr(e.ts) + '</td><td><span class="' + cls + '">' + e.ev + '</span></td><td>' + coin(e.symbol, e.mint) + '</td><td>' + esc(detail) + (e.ev === 'close' ? ' · <b class="' + (e.pnlSol >= 0 ? 'pos' : 'neg') + '">' + (e.pnlSol >= 0 ? '+' : '') + (e.pnlSol ?? 0).toFixed(4) + '</b>' : '') + '</td></tr>';
     }).join('') : '<tr><td colspan="4">Nothing yet — waiting for the first trigger or 40+ score.</td></tr>';
-    $('scores').innerHTML = d.recentScores.map(s2 => '<tr><td>' + tstr(s2.ts) + '</td><td>' + esc(s2.symbol) + '</td><td>' + s2.score + '</td><td>' + Object.entries(s2.parts || {}).filter(([, v]) => v).map(([k, v]) => k + ' ' + (v > 0 ? '+' : '') + v).join(' · ') + '</td></tr>').join('');
-    $('top').innerHTML = d.topScores.map(s2 => '<tr><td>' + esc(s2.symbol) + '</td><td>' + s2.score + '</td><td>' + ago(s2.ts) + '</td></tr>').join('');
+    $('scores').innerHTML = d.recentScores.map(s2 => '<tr><td>' + tstr(s2.ts) + '</td><td>' + coin(s2.symbol, s2.mint) + '</td><td>' + s2.score + '</td><td>' + Object.entries(s2.parts || {}).filter(([, v]) => v).map(([k, v]) => k + ' ' + (v > 0 ? '+' : '') + v).join(' · ') + '</td></tr>').join('');
+    $('top').innerHTML = d.topScores.map(s2 => '<tr><td>' + coin(s2.symbol, s2.mint) + '</td><td>' + s2.score + '</td><td>' + ago(s2.ts) + '</td></tr>').join('');
   } catch { $('live').textContent = 'reconnecting…'; }
 }
 tick(); setInterval(tick, 30000);
