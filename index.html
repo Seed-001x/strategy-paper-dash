@@ -77,6 +77,7 @@ async function tick() {
       let detail = '', cls = 'pill';
       if (e.ev === 'score') { detail = 'score ' + e.score; cls += ' hot'; }
       if (e.ev === 'near_miss') detail = 'near-miss · gain ' + (e.gain != null ? Math.round(e.gain * 100) + '%' : '—') + ' · ratio ' + (e.ratio ?? '—');
+      if (e.ev === 'blocked') detail = 'rule: ' + (e.reason || e.rule);
       if (e.ev === 'open') detail = 'trigger ' + e.trigger + ' · score ' + e.score + ' · ' + e.sizeSol + ' SOL';
       if (e.ev === 'partial') detail = e.reason + ' · +' + (e.proceedsSol ?? 0).toFixed(4) + ' SOL out';
       if (e.ev === 'close') { detail = e.reason; cls += (e.pnlSol >= 0 ? ' win' : ' loss'); }
